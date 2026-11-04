@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { backupSchema, detachSkillFromPaths, getTimeGreeting, isPracticeDateInPeriod, isSafeResourceUrl, localDateKey, markPracticeSessionDeleted, normalizeDisplayName, normalizeSkillCategory, readJsonStorage, removePathResources, synchronizeLegacyPracticeSessions, writeJsonBatch, type DeletedPracticeSessions, type PracticePeriod } from './dataIntegrity.ts'
 import './App.css'
 
+const AI_FEATURES_ENABLED = !import.meta.env.PROD
+
 type Task = { title: string; completed: boolean }
 type View = 'Dashboard' | 'Explore Skills' | 'AI Learning Planner' | 'My learning paths' | 'Practice journal' | 'Settings'
 type RouteState = { page: View; skillId?: string; pathId?: string }
@@ -1296,7 +1298,12 @@ function SkillDetail({ skill, onBack, onStart, onEdit, onDelete, personalResourc
   return <><button className="back-button" onClick={onBack} type="button">← Back to Explore Skills</button><section className="skill-detail-hero"><SkillVisual skill={skill} /><div><span className="category">{skill.category}</span><h1>{skill.title}</h1><p>{skill.summary}</p><button className="primary-button" onClick={onStart} type="button">Start learning <span aria-hidden="true">→</span></button>{skill.isCustom && <div className="skill-actions"><button className="text-button" onClick={onEdit} type="button">Edit skill</button><button className="delete-button" onClick={onDelete} type="button">Delete skill</button></div>}</div></section><div className="detail-grid"><article className="detail-panel"><span className="eyebrow">Begin here</span><h2>What you’ll need</h2><p>{skill.equipment}</p><h2>How to start</h2><ol className="roadmap">{skill.roadmap.map((step, index) => <li key={step}><span>{index + 1}</span>{step}</li>)}</ol></article><article className="detail-panel"><span className="eyebrow">A gentle progression</span><h2>Suggested milestones</h2><ul className="milestone-list">{skill.milestones.map((milestone) => <li key={milestone}><span>○</span>{milestone}</li>)}</ul><h2>Learning resources</h2><div className="resource-list">{skill.resources.map((resource) => resource.url && isSafeResourceUrl(resource.url) ? <a href={resource.url} key={`${resource.label}-${resource.url}`} rel="noopener noreferrer" target="_blank"><span>{resource.type}</span><strong>{resource.label}</strong><em aria-hidden="true">↗</em></a> : <div className="saved-session" key={resource.id ?? resource.label}><span>{resource.type}</span><strong>{resource.label}</strong><em>Offline</em></div>)}</div><h2>Personal resources</h2><ResourceForm key={editingResource?.id ?? 'new-resource'} resource={editingResource} onSave={(resource) => { if (editingResource) onUpdateResource(resource); else onAddResource(resource); setEditingResource(null) }} /><div className="resource-list">{personalResources.map((resource) => <div className="saved-session" key={resource.id}><span>{resource.type}</span><strong>{resource.label}{resource.notes ? ` — ${resource.notes}` : ''}</strong>{resource.url && isSafeResourceUrl(resource.url) ? <a href={resource.url} target="_blank"   rel="noopener noreferrer">Open</a> : <em>Offline</em>}<button className="text-button" onClick={() => setEditingResource(resource)} type="button">Edit</button><button className="delete-button" onClick={() => { if (resource.id) onDeleteResource(resource.id) }} type="button">Delete</button></div>)}</div></article></div></>
 }
 
-function ReflectionCoach({ path, journalEntries, completedTaskTitles, remainingTaskTitles }: { path: SavedLearningPath; journalEntries: JournalEntry[]; completedTaskTitles: string[]; remainingTaskTitles: string[] }) {
+function ReflectionCoach(props: { path: SavedLearningPath; journalEntries: JournalEntry[]; completedTaskTitles: string[]; remainingTaskTitles: string[] }) {
+  if (!AI_FEATURES_ENABLED) return <AiUnavailableNotice feature="Reflection Coach" />
+  return <EnabledReflectionCoach {...props} />
+}
+
+function EnabledReflectionCoach({ path, journalEntries, completedTaskTitles, remainingTaskTitles }: { path: SavedLearningPath; journalEntries: JournalEntry[]; completedTaskTitles: string[]; remainingTaskTitles: string[] }) {
   const [question, setQuestion] = useState('')
   const [reflection, setReflection] = useState<Reflection | null>(null)
   const [error, setError] = useState('')
@@ -1354,7 +1361,16 @@ function ReflectionCoach({ path, journalEntries, completedTaskTitles, remainingT
   return <section className={`reflection-coach panel ${isExpanded ? 'expanded' : 'collapsed'}`}><button className="reflection-toggle" onClick={() => setIsExpanded((current) => !current)} type="button" aria-expanded={isExpanded}><span><span className="eyebrow">Optional AI reflection</span><strong>Reflection Coach</strong><small>Read-only analysis of this path's recorded progress.</small></span><span aria-hidden="true">{isExpanded ? '−' : '+'}</span></button>{isExpanded && <div className="reflection-content"><p className="section-help">Your selected path, tasks and journal records will be sent to Gemini when you click Ask Coach. Nothing is saved or changed automatically.</p><div className="reflection-facts"><span>Goal: <strong>{path.goal?.title ?? 'No goal recorded'}</strong></span><span>{completedTaskTitles.length} completed · {remainingTaskTitles.length} remaining tasks</span><span>{formatDuration(actualPracticeMinutes)} actual practice · {selectedJournalEntries.length} journal entries</span><span>{achievements.length} achievements · {difficulties.length} difficulties recorded</span></div><div className="reflection-questions">{questions.map((item) => <button className="category-filter" key={item} onClick={() => setQuestion(item)} type="button">{item}</button>)}</div><textarea className="reflection-question" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask a question about your recorded progress..." rows={3} /><button className="primary-button" disabled={isLoading || !question.trim()} onClick={askCoach} type="button">{isLoading ? 'Reflecting…' : 'Ask Coach'}</button>{error && <p className="planner-error" role="alert">{error}</p>}{reflection && <div className="reflection-answer" role="status">{reflection.answer}{'toolRan' in reflection && reflection.toolRan ? <small className="reflection-tool-status">Practice consistency tool used</small> : null}</div>}</div>}</section>
 }
 
-function AIPlanner({ inputs, onInputsChange, onSaved }: { inputs: PlannerInputs; onInputsChange: (inputs: PlannerInputs) => void; onSaved: (path: SavedLearningPath) => void }) {
+function AIPlanner(props: { inputs: PlannerInputs; onInputsChange: (inputs: PlannerInputs) => void; onSaved: (path: SavedLearningPath) => void }) {
+  if (!AI_FEATURES_ENABLED) return <AiUnavailableNotice feature="AI Learning Planner" />
+  return <EnabledAIPlanner {...props} />
+}
+
+function AiUnavailableNotice({ feature }: { feature: string }) {
+  return <section className="panel ai-unavailable" role="status"><span className="eyebrow">Optional AI feature</span><h2>{feature} is unavailable in the public build</h2><p>AI features are available when running SkillPath locally with a Gemini API key.</p></section>
+}
+
+function EnabledAIPlanner({ inputs, onInputsChange, onSaved }: { inputs: PlannerInputs; onInputsChange: (inputs: PlannerInputs) => void; onSaved: (path: SavedLearningPath) => void }) {
   const [draft, setDraft] = useState<GeneratedPlan | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
