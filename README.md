@@ -2,7 +2,7 @@
 
 **A personal learning organizer and progress tracker.**
 
-[Live Demo](https://skillpath-b5v.pages.dev/) | [Source Code](https://github.com/lidia-azizian/skillpath)
+[Live Demo](https://skillpath-b5v.pages.dev/) | [Source Code](https://github.com/lidia-azizian/skillpath) | [How I Built SkillPath](docs/development-story.md)
 
 The live demo includes the core learning and progress-tracking features. Gemini AI features are available when running the project locally with an API key.
 
