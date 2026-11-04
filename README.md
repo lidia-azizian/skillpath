@@ -2,6 +2,10 @@
 
 **A personal learning organizer and progress tracker.**
 
+[Live Demo](https://skillpath-b5v.pages.dev/) | [Source Code](https://github.com/lidia-azizian/skillpath)
+
+The live demo includes the core learning and progress-tracking features. Gemini AI features are available when running the project locally with an API key.
+
 SkillPath helps users organize goals, document practice, manage learning resources, and track progress across different skills and hobbies. It supports independent learning and activities outside the app rather than providing lessons or courses.
 
 ## Features
